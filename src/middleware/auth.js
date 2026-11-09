@@ -84,4 +84,18 @@ const authenticate = asyncHandler(async (req, res, next) => {
   next();
 });
 
-module.exports = { authenticate };
+const rejectAdminDataCollection = (req, res, next) => {
+  if (req.user && req.user.role === "ADMIN") {
+    return next(
+      new ApiError(
+        403,
+        "Administrator accounts cannot register devices or submit device data.",
+        "ADMIN_DATA_COLLECTION_DISABLED",
+      ),
+    );
+  }
+
+  return next();
+};
+
+module.exports = { authenticate, rejectAdminDataCollection };

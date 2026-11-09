@@ -1,6 +1,6 @@
 const express = require("express");
 const asyncHandler = require("../utils/asyncHandler");
-const { authenticate } = require("../middleware/auth");
+const { authenticate, rejectAdminDataCollection } = require("../middleware/auth");
 const { ensureCloudinaryConfigured } = require("../config/cloudinary");
 const { documentUpload } = require("../middleware/upload");
 const documentController = require("../controllers/document.controller");
@@ -13,6 +13,7 @@ router.get("/", asyncHandler(documentController.listDocuments));
 
 router.post(
   "/",
+  rejectAdminDataCollection,
   ensureCloudinaryConfigured,
   documentUpload.single("file"),
   asyncHandler(documentController.uploadDocument),
