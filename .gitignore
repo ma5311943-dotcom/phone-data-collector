@@ -8,3 +8,4 @@ coverage/
 dist/
 .DS_Store
 Thumbs.db
+scripts/*.tmp.js
