@@ -1,0 +1,331 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("MYSQL_URL")
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+  OTHER
+}
+
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum CloudinaryResourceType {
+  IMAGE
+  VIDEO
+  RAW
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum CallType {
+  INCOMING
+  OUTGOING
+  MISSED
+  UNKNOWN
+}
+
+enum SmsDirection {
+  INBOUND
+  OUTBOUND
+  UNKNOWN
+}
+
+enum SyncType {
+  FULL
+  INCREMENTAL
+  MANUAL
+}
+
+enum SyncStatus {
+  IN_PROGRESS
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Char(36)
+  email        String   @unique @db.VarChar(191)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  fullName     String   @map("full_name") @db.VarChar(120)
+  role         Role     @default(STUDENT)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  devices         Device[]
+  assignments     Assignment[]
+  documents       Document[]
+  media           Media[]
+  contacts        Contact[]
+  callRecords     AuthorizedCallRecord[]
+  smsRecords      AuthorizedSmsRecord[]
+  syncHistories   SyncHistory[]
+  deviceInfos     DeviceInfo[]
+  locationRecords LocationRecord[]
+
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Device {
+  id               String         @id @default(uuid()) @db.Char(36)
+  userId           String         @map("user_id") @db.Char(36)
+  deviceIdentifier String         @map("device_identifier") @db.VarChar(191)
+  name             String         @db.VarChar(120)
+  platform         DevicePlatform
+  model            String?        @db.VarChar(120)
+  osVersion        String?        @map("os_version") @db.VarChar(50)
+  appVersion       String?        @map("app_version") @db.VarChar(50)
+  pushToken        String?        @map("push_token") @db.VarChar(255)
+  isActive         Boolean        @default(true) @map("is_active")
+  lastSyncedAt     DateTime?      @map("last_synced_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments     Assignment[]
+  documents       Document[]
+  media           Media[]
+  contacts        Contact[]
+  callRecords     AuthorizedCallRecord[]
+  smsRecords      AuthorizedSmsRecord[]
+  syncHistories   SyncHistory[]
+  deviceInfo      DeviceInfo?
+  locationRecords LocationRecord[]
+
+  @@unique([userId, deviceIdentifier])
+  @@index([userId, isActive])
+  @@index([lastSyncedAt])
+  @@map("devices")
+}
+
+model Assignment {
+  id          String           @id @default(uuid()) @db.Char(36)
+  authorId    String           @map("author_id") @db.Char(36)
+  deviceId    String?          @map("device_id") @db.Char(36)
+  title       String           @db.VarChar(200)
+  description String?          @db.Text
+  dueDate     DateTime?        @map("due_date")
+  status      AssignmentStatus @default(PUBLISHED)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  device    Device?    @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  documents Document[]
+
+  @@index([authorId, createdAt])
+  @@index([deviceId])
+  @@index([status, dueDate])
+  @@map("assignments")
+}
+
+model Document {
+  id           String                 @id @default(uuid()) @db.Char(36)
+  userId       String                 @map("user_id") @db.Char(36)
+  deviceId     String?                @map("device_id") @db.Char(36)
+  assignmentId String?                @map("assignment_id") @db.Char(36)
+  publicId     String                 @unique @map("public_id") @db.VarChar(255)
+  url          String                 @db.VarChar(2048)
+  fileName     String                 @map("file_name") @db.VarChar(255)
+  fileType     String                 @map("file_type") @db.VarChar(100)
+  fileSize     Int                    @map("file_size")
+  resourceType CloudinaryResourceType @map("resource_type")
+  format       String?                @db.VarChar(20)
+  createdAt    DateTime               @default(now()) @map("created_at")
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device     Device?     @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  assignment Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([deviceId])
+  @@index([assignmentId])
+  @@index([fileType])
+  @@map("documents")
+}
+
+model Media {
+  id        String    @id @default(uuid()) @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  deviceId  String?   @map("device_id") @db.Char(36)
+  publicId  String    @unique @map("public_id") @db.VarChar(255)
+  url       String    @db.VarChar(2048)
+  fileName  String    @map("file_name") @db.VarChar(255)
+  fileType  String    @map("file_type") @db.VarChar(100)
+  fileSize  Int       @map("file_size")
+  mediaType MediaType @map("media_type")
+  format    String?   @db.VarChar(20)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, mediaType, createdAt])
+  @@index([deviceId])
+  @@map("media")
+}
+
+model Contact {
+  id           String   @id @default(uuid()) @db.Char(36)
+  userId       String   @map("user_id") @db.Char(36)
+  deviceId     String   @map("device_id") @db.Char(36)
+  externalId   String?  @map("external_id") @db.VarChar(191)
+  name         String   @db.VarChar(160)
+  phoneNumber  String   @map("phone_number") @db.VarChar(30)
+  email        String?  @db.VarChar(191)
+  isAuthorized Boolean  @default(true) @map("is_authorized")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device      Device                 @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  callRecords AuthorizedCallRecord[]
+  smsRecords  AuthorizedSmsRecord[]
+
+  @@unique([deviceId, phoneNumber])
+  @@index([userId, name])
+  @@index([phoneNumber])
+  @@map("contacts")
+}
+
+model AuthorizedCallRecord {
+  id              String   @id @default(uuid()) @db.Char(36)
+  userId          String   @map("user_id") @db.Char(36)
+  deviceId        String   @map("device_id") @db.Char(36)
+  contactId       String?  @map("contact_id") @db.Char(36)
+  externalId      String?  @map("external_id") @db.VarChar(191)
+  phoneNumber     String   @map("phone_number") @db.VarChar(30)
+  callType        CallType @default(UNKNOWN) @map("call_type")
+  startedAt       DateTime @map("started_at")
+  durationSeconds Int      @default(0) @map("duration_seconds")
+  isAuthorized    Boolean  @default(true) @map("is_authorized")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device  Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@unique([deviceId, externalId])
+  @@index([userId, startedAt])
+  @@index([deviceId, startedAt])
+  @@index([phoneNumber])
+  @@map("authorized_call_records")
+}
+
+model AuthorizedSmsRecord {
+  id           String       @id @default(uuid()) @db.Char(36)
+  userId       String       @map("user_id") @db.Char(36)
+  deviceId     String       @map("device_id") @db.Char(36)
+  contactId    String?      @map("contact_id") @db.Char(36)
+  externalId   String?      @map("external_id") @db.VarChar(191)
+  phoneNumber  String       @map("phone_number") @db.VarChar(30)
+  direction    SmsDirection @default(UNKNOWN)
+  body         String?      @db.Text
+  sentAt       DateTime     @map("sent_at")
+  isAuthorized Boolean      @default(true) @map("is_authorized")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device  Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@unique([deviceId, externalId])
+  @@index([userId, sentAt])
+  @@index([deviceId, sentAt])
+  @@index([phoneNumber])
+  @@map("authorized_sms_records")
+}
+
+model SyncHistory {
+  id             String     @id @default(uuid()) @db.Char(36)
+  userId         String     @map("user_id") @db.Char(36)
+  deviceId       String     @map("device_id") @db.Char(36)
+  syncType       SyncType   @default(MANUAL) @map("sync_type")
+  status         SyncStatus @default(IN_PROGRESS)
+  startedAt      DateTime   @default(now()) @map("started_at")
+  completedAt    DateTime?  @map("completed_at")
+  deviceSyncedAt DateTime?  @map("device_synced_at")
+  itemsSynced    Int        @default(0) @map("items_synced")
+  stats          Json?
+  errorMessage   String?    @map("error_message") @db.Text
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, startedAt])
+  @@index([userId, startedAt])
+  @@index([status])
+  @@map("sync_history")
+}
+
+model DeviceInfo {
+  id             String   @id @default(uuid()) @db.Char(36)
+  userId         String   @map("user_id") @db.Char(36)
+  deviceId       String   @unique @map("device_id") @db.Char(36)
+  brand          String?  @db.VarChar(80)
+  manufacturer   String?  @db.VarChar(120)
+  modelName      String?  @map("model_name") @db.VarChar(120)
+  deviceName     String?  @map("device_name") @db.VarChar(120)
+  androidVersion String?  @map("android_version") @db.VarChar(30)
+  apiLevel       Int?     @map("api_level")
+  batteryLevel   Int?     @map("battery_level")
+  batteryState   String?  @map("battery_state") @db.VarChar(30)
+  isCharging     Boolean? @map("is_charging")
+  totalStorageMb Int?     @map("total_storage_mb")
+  freeStorageMb  Int?     @map("free_storage_mb")
+  totalMemoryMb  Int?     @map("total_memory_mb")
+  usedMemoryMb   Int?     @map("used_memory_mb")
+  networkType    String?  @map("network_type") @db.VarChar(30)
+  isConnected    Boolean? @map("is_connected")
+  ipAddress      String?  @map("ip_address") @db.VarChar(64)
+  reportedAt     DateTime @default(now()) @map("reported_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, reportedAt])
+  @@map("device_info")
+}
+
+model LocationRecord {
+  id         String   @id @default(uuid()) @db.Char(36)
+  userId     String   @map("user_id") @db.Char(36)
+  deviceId   String   @map("device_id") @db.Char(36)
+  latitude   Float
+  longitude  Float
+  accuracy   Float?
+  altitude   Float?
+  capturedAt DateTime @default(now()) @map("captured_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, capturedAt])
+  @@index([userId, capturedAt])
+  @@map("location_records")
+}
